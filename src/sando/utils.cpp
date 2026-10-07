@@ -495,6 +495,7 @@ Eigen::Vector3d projectPointToBox(
 }
 
 // Project point to a sphere
+// 将一个点 P2 投影到以 P1 为中心、指定半径 radius 的球体表面上。如果点 P2 已经在球体内部（或表面），则直接返回点 P2；否则，将点 P2 沿着从 P1 指向 P2 的方向投影到球体表面
 Eigen::Vector3d projectPointToSphere(
     const Eigen::Vector3d& P1, const Eigen::Vector3d& P2, double radius) {
   // If the point is already inside the sphere, return the point

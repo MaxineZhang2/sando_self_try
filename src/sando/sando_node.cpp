@@ -11,24 +11,24 @@
 // ----------------------------------------------------------------------------
 
 SANDO_NODE::SANDO_NODE() : Node("sando_node") {
-  // Get id from ns
-  ns_ = this->get_namespace();
-  ns_ = ns_.substr(ns_.find_last_of("/") + 1);
-  id_str_ = ns_.substr(
+  // Get id from ns，从 namespace 提取无人机 ID
+  ns_ = this->get_namespace();    // 如 "/NX01"
+  ns_ = ns_.substr(ns_.find_last_of("/") + 1);    // 去掉前导 "/"，得到 "NX01"
+  id_str_ = ns_.substr(    // 取最后两位 "01"
       ns_.size() - 2);  // ns is like NX01, so we get the last two characters and convert to int
-  id_ = std::stoi(id_str_);
+  id_ = std::stoi(id_str_);    // 转成整数 1
 
-  // Declare, set, and print parameters
+  // Declare, set, and print parameters，参数声明 / 设置 / 打印
   this->declareParameters();
   this->setParameters();
   this->printParameters();
 
-  // Qos policy settings
+  // Qos policy settings，关键话题（轨迹共享、状态、目标）用 reliable QoS，保证不丢包。因为多机协作时丢一条轨迹可能导致撞机
   rclcpp::QoS critical_qos(rclcpp::KeepLast(10));
   critical_qos.reliable().durability_volatile();
 
-  // Create callbackgroup
-  this->cb_group_mu_1_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  // Create callbackgroup， 并发控制的核心
+  this->cb_group_mu_1_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);    // MutuallyExclusive（互斥），同组内的回调串行执行，防止数据竞争
   this->cb_group_mu_2_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   this->cb_group_mu_3_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   this->cb_group_mu_4_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
@@ -37,8 +37,8 @@ SANDO_NODE::SANDO_NODE() : Node("sando_node") {
   this->cb_group_mu_7_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   this->cb_group_mu_8_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   this->cb_group_mu_9_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  this->cb_group_re_1_ = this->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
-  this->cb_group_re_2_ = this->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
+  this->cb_group_re_1_ = this->create_callback_group(rclcpp::CallbackGroupType::Reentrant);    // Reentrant（可重入），同组内的回调可以并行执行
+  this->cb_group_re_2_ = this->create_callback_group(rclcpp::CallbackGroupType::Reentrant);    // （轨迹/状态订阅）用可重入，因为接收消息要快，不能互相阻塞。
   this->cb_group_re_3_ = this->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
   this->cb_group_re_4_ = this->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
   this->cb_group_re_5_ = this->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
@@ -46,12 +46,12 @@ SANDO_NODE::SANDO_NODE() : Node("sando_node") {
   this->cb_group_re_7_ = this->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
   this->cb_group_re_8_ = this->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
   this->cb_group_re_9_ = this->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
-  this->cb_group_map_ = this->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
-  this->cb_group_replan_ =
+  this->cb_group_map_ = this->create_callback_group(rclcpp::CallbackGroupType::Reentrant);    //（地图更新）独立，避免和状态回调抢锁
+  this->cb_group_replan_ =    // cb_group_replan_（重规划）用互斥，因为重规划不能被自己打断——上一次还在算，下一次不能同时进来
       this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  this->cb_group_goal_ = this->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
+  this->cb_group_goal_ = this->create_callback_group(rclcpp::CallbackGroupType::Reentrant);    // 目标发布（可重入）
 
-  // Options for callback group
+  // Options for callback group, 把 CallbackGroup 绑定到具体的订阅上
   rclcpp::SubscriptionOptions options_re_1;
   options_re_1.callback_group = this->cb_group_re_1_;
   rclcpp::SubscriptionOptions options_re_2;
@@ -99,8 +99,7 @@ SANDO_NODE::SANDO_NODE() : Node("sando_node") {
   pub_actual_traj_ = this->create_publisher<visualization_msgs::msg::MarkerArray>(
       "actual_traj", 10);                                                         // visual level 1
   pub_fov_ = this->create_publisher<visualization_msgs::msg::Marker>("fov", 10);  // visual level 1
-  pub_cp_ =
-      this->create_publisher<visualization_msgs::msg::MarkerArray>("cp", 10);  // visual level 1
+  pub_cp_ = this->create_publisher<visualization_msgs::msg::MarkerArray>("cp", 10);  // visual level 1
   pub_static_push_points_ = this->create_publisher<visualization_msgs::msg::MarkerArray>(
       "static_push_points", 10);  // visual level 1
   pub_p_points_ = this->create_publisher<visualization_msgs::msg::MarkerArray>(
@@ -133,11 +132,13 @@ SANDO_NODE::SANDO_NODE() : Node("sando_node") {
   pub_goal_ = this->create_publisher<dynus_interfaces::msg::Goal>("goal", critical_qos);
   pub_goal_reached_ = this->create_publisher<std_msgs::msg::Empty>("goal_reached", critical_qos);
 
-  // Subscribers
+  // Subscribers，创建订阅
   if (!par_.ignore_other_trajs)
     sub_traj_ = this->create_subscription<dynus_interfaces::msg::DynTraj>(
-        "/trajs", critical_qos, std::bind(&SANDO_NODE::trajCallback, this, std::placeholders::_1),
-        options_re_1);
+        "/trajs",     // 参数 1：话题名
+        critical_qos,     // 参数 2：QoS
+        std::bind(&SANDO_NODE::trajCallback, this, std::placeholders::_1),    // 参数 3：回调函数
+        options_re_1);    // 参数 4：订阅选项
   sub_predicted_traj_ = this->create_subscription<dynus_interfaces::msg::DynTraj>(
       "predicted_trajs", critical_qos,
       std::bind(&SANDO_NODE::trajCallback, this, std::placeholders::_1), options_re_1);
@@ -166,22 +167,30 @@ SANDO_NODE::SANDO_NODE() : Node("sando_node") {
     timer_initial_pose_ = this->create_wall_timer(
         100ms, std::bind(&SANDO_NODE::getInitialPoseHwCallback, this), this->cb_group_mu_9_);
 
-  // Stop the timer for callback
-  if (timer_replanning_) timer_replanning_->cancel();
+  // Stop the timer for callback，构造函数不完整时，不能让定时器触发回调
+  if (timer_replanning_) timer_replanning_->cancel();    // 因为 timer_replanning_ 是 SharedPtr，理论上创建后一定非空，但万一创建失败（比如资源不够），避免空指针崩溃；timer_replanning_ 创建后立即被 cancel
   if (timer_goal_) timer_goal_->cancel();
   if (!use_benchmark_ && timer_goal_reached_check_) timer_goal_reached_check_->cancel();
 
   // Initialize the SANDO object
-  sando_ptr_ = std::make_shared<SANDO>(par_);
+  sando_ptr_ = std::make_shared<SANDO>(par_);   
+  // std::make_shared：C++11 智能指针工厂函数，一次性分配内存 + 构造对象，比 new + shared_ptr 更高效
+  // SANDO：核心规划器类；
+  // par_：参数结构体，包含所有从 ROS 参数服务器读来的配置——初始化地图（MapUtil）；初始化全局规划器（JPS/A*）；初始化 SFC 分解器；初始化局部轨迹优化器（Gurobi）；初始化 Yaw 规划器；读取所有超参数。
 
   // Initialize the tf2 buffer and listener
-  tf2_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
-  tf2_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf2_buffer_);
-  auto timer_interface = std::make_shared<tf2_ros::CreateTimerROS>(
-      this->get_node_base_interface(), this->get_node_timers_interface());
-  tf2_buffer_->setCreateTimerInterface(timer_interface);
+  tf2_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());    // tf2_ros::Buffer是TF变换的缓存，存储最近一段时间（默认 10 秒）的变换历史，提供 lookupTransform(target, source, time) 查询接口，参数 this->get_clock()传入节点的时钟
+  tf2_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf2_buffer_);    // TransformListener订阅 /tf 和 /tf_static,收到变换后自动填充 buffer,参数 *tf2_buffer_：**引用** buffer（不是指针），listener 会往 buffer 里写数据
+  // tf2_ros::Buffer 需要定期清理过期变换（否则内存泄漏），清理需要一个定时器，但 tf2_ros::Buffer 是独立的库，不知道 ROS 2 节点的存在，所以需要外部注入一个"创建定时器"的接口。
+  auto timer_interface = std::make_shared<tf2_ros::CreateTimerROS>(    // CreateTimerROS是一个工厂类，它用 ROS 2 节点的定时器基础设施创建定时器，这样 tf2_buffer_ 就能用节点的定时器来清理自己
+      this->get_node_base_interface(), this->get_node_timers_interface());    // this->get_node_base_interface()：节点的基础接口；this->get_node_timers_interface()：节点的定时器接口
+  tf2_buffer_->setCreateTimerInterface(timer_interface);    // setCreateTimerInterface之后，tf2_buffer_ 会自动创建清理定时器，每 10 秒清理一次过期变换，内存稳定
+  // tf2_listener_ 订阅 TF 话题；
+  // 收到变换 → 写入 tf2_buffer_；
+  // timer_interface 让 buffer 能创建清理定时器；
+  // 需要时调用 tf2_buffer_->lookupTransform(...) 查询。
 
-  // Initialize the d435 depth frame ID and camera
+  // Initialize the d435 depth frame ID and camera，设置 frame ID（规定好命名）
   d435_depth_frame_id_ = ns_ + "/" + ns_ + "_d435_depth_optical_frame";
   lidar_frame_id_ = ns_ + "/NX01_livox";
 
@@ -192,12 +201,12 @@ SANDO_NODE::SANDO_NODE() : Node("sando_node") {
   initial_pose_topic_ = ns_ + "/init_pose";
 
   if (par_.sim_env == "fake_sim") {
-    std::string topic_name = "sensor_point_cloud";
-    if (par_.use_global_pc) topic_name = "/map_generator/global_cloud";
+    std::string topic_name = "sensor_point_cloud";    // 默认订阅的点云数据主题为 "sensor_point_cloud"
+    if (par_.use_global_pc) topic_name = "/map_generator/global_cloud";    // 如果启用了全局点云（use_global_pc），则订阅的主题改为 "/map_generator/global_cloud"，这可能是一个全局地图生成器发布的点云数据
 
     sub_fake_sim_occupancy_map_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-        topic_name, rclcpp::QoS(rclcpp::QoSInitialization::from_rmw(rmw_qos_profile_sensor_data)),
-        std::bind(&SANDO_NODE::occupancyMapCallback, this, std::placeholders::_1), options_map);
+        topic_name, rclcpp::QoS(rclcpp::QoSInitialization::from_rmw(rmw_qos_profile_sensor_data)),    // **QoS**：使用传感器数据的 QoS 配置（rmw_qos_profile_sensor_data）
+        std::bind(&SANDO_NODE::occupancyMapCallback, this, std::placeholders::_1), options_map);    // 回调函数：occupancyMapCallback，用于处理接收到的点云数据
   } else if (par_.sim_env == "rviz_only") {
     // In rviz_only mode, initialize map with empty point cloud (no sensor simulation)
     // This initializes the HGP manager so planner can start
@@ -208,9 +217,9 @@ SANDO_NODE::SANDO_NODE() : Node("sando_node") {
     // Synchronize the occupancy grid and unknown grid
     occup_grid_sub_.subscribe(this, "occupancy_grid", rmw_qos_profile_sensor_data, options_map);
     unknown_grid_sub_.subscribe(this, "unknown_grid", rmw_qos_profile_sensor_data, options_map);
-    sync_.reset(new Sync(MySyncPolicy(10), occup_grid_sub_, unknown_grid_sub_));
-    sync_->registerCallback(
-        std::bind(&SANDO_NODE::mapCallback, this, std::placeholders::_1, std::placeholders::_2));
+    sync_.reset(new Sync(MySyncPolicy(10), occup_grid_sub_, unknown_grid_sub_));     // 创建一个同步器（sync_），用于同步占用网格和未知网格数据
+    sync_->registerCallback(    // 注册回调函数 mapCallback，当两个订阅者的数据同步时触发
+        std::bind(&SANDO_NODE::mapCallback, this, std::placeholders::_1, std::placeholders::_2));    
   }
 }
 
@@ -219,7 +228,7 @@ SANDO_NODE::SANDO_NODE() : Node("sando_node") {
 SANDO_NODE::~SANDO_NODE() {
   // release the memory
   sando_ptr_.reset();
-}
+}    // 显式 reset 是为了尽早释放（不等 SANDO_NODE 完全析构）
 
 // ----------------------------------------------------------------------------
 
@@ -786,34 +795,34 @@ void SANDO_NODE::cleanUpOldTrajsCallback() {
 }
 
 // ----------------------------------------------------------------------------
-
+// 当节点订阅的 DynTraj 消息主题接收到数据时，ROS 2 会调用这个函数,一个轨迹数据的接收与处理流程
 void SANDO_NODE::trajCallback(const dynus_interfaces::msg::DynTraj::SharedPtr msg) {
-  // Filter out its own traj
+  // Filter out its own traj，过滤自身轨迹
   if (msg->id == id_) return;
 
-  // Get current time
+  // Get current time，确保轨迹的时间戳与当前时间同步，便于后续的轨迹管理和处理
   double current_time = this->now().seconds();
 
-  // Get DynTraj from the message
-  auto traj = std::make_shared<DynTraj>();
-  convertDynTrajMsg2DynTraj(*msg, traj, current_time);
+  // Get DynTraj from the message，从消息中提取轨迹数据
+  auto traj = std::make_shared<DynTraj>();    // 创建一个新的 DynTraj 对象，并使用智能指针（shared_ptr）管理其生命周期，DynTraj 是轨迹的内部数据结构，可能包含轨迹的详细信息（如位置、速度、时间戳等）
+  convertDynTrajMsg2DynTraj(*msg, traj, current_time);    // *msg：接收到的消息，传递给转换函数；traj：转换后的轨迹数据；current_time：当前时间，用于更新轨迹的时间戳。
 
   // Pass the DynTraj to sando.cpp
-  sando_ptr_->addTraj(traj, current_time);
+  sando_ptr_->addTraj(traj, current_time);    // 将轨迹传递给 sando.cpp
 }
 
 // ----------------------------------------------------------------------------
-
-void SANDO_NODE::stateCallback(const dynus_interfaces::msg::State::SharedPtr msg) {
-  if (par_.use_state_update) {
-    RobotState current_state;
-    current_state.setPos(msg->pos.x, msg->pos.y, msg->pos.z);
+// 用于处理接收到的机器人状态消息（State），并根据配置参数更新机器人状态、发布相关信息以及可视化轨迹
+void SANDO_NODE::stateCallback(const dynus_interfaces::msg::State::SharedPtr msg) {    // **stateCallback**是 ROS 2 的订阅回调函数，当节点订阅的 State 消息主题接收到数据时，ROS 2 会调用这个函数
+  if (par_.use_state_update) {    // **par_.use_state_update**是一个配置参数，表示是否启用状态更新功能
+    RobotState current_state;    // 创建一个 RobotState 对象，用于存储当前的机器人状态
+    current_state.setPos(msg->pos.x, msg->pos.y, msg->pos.z);    // 设置机器人的位置，使用接收到的 msg->pos 数据
     current_state.setVel(msg->vel.x, msg->vel.y, msg->vel.z);
     current_state.setAccel(0.0, 0.0, 0.0);
     double roll, pitch, yaw;
     quaternion2Euler(msg->quat, roll, pitch, yaw);
     current_state.setYaw(yaw);
-    sando_ptr_->updateState(current_state);
+    sando_ptr_->updateState(current_state);    // 调用 sando_ptr_ 的 updateState 方法，将当前状态更新到机器人状态管理模块中
 
     // publish the state
     publishCurrentState(current_state);
@@ -843,11 +852,11 @@ void SANDO_NODE::stateCallback(const dynus_interfaces::msg::State::SharedPtr msg
   // Throttle actual trajectory publish to ~20 Hz. stateCallback runs at the state
   // publish rate (100 Hz+) and the actual_traj MarkerArray grows over time, so
   // publishing every state message floods RViz and causes "some messages were lost".
-  if (par_.visual_level >= 1) {
-    const double t_now_at = this->now().seconds();
-    if (t_now_at - last_actual_traj_viz_publish_t_ >= 0.05) {  // 50 ms throttle = 20 Hz
+  if (par_.visual_level >= 1) {    // 如果可视化级别大于等于 1，则执行轨迹发布逻辑
+    const double t_now_at = this->now().seconds();    // 获取当前时间
+    if (t_now_at - last_actual_traj_viz_publish_t_ >= 0.05) {  // 50 ms throttle = 20 Hz，控制轨迹发布的频率为 20 Hz（50 毫秒一次）。防止轨迹发布过于频繁，导致 RViz 消息丢失
       publishActualTraj();
-      last_actual_traj_viz_publish_t_ = t_now_at;
+      last_actual_traj_viz_publish_t_ = t_now_at;    // 更新上一次轨迹发布的时间
     }
   }
 }
@@ -1046,23 +1055,32 @@ void SANDO_NODE::getInitialPoseHwCallback() {
 }
 
 // ----------------------------------------------------------------------------
-
+// 主要功能是将 ROS 2 消息类型 dynus_interfaces::msg::DynTraj 转换为内部使用的 DynTraj 数据结构
+// 解析轨迹信息:
+// 处理边界框、轨迹 ID、当前位置、未来轨迹、协方差等信息。
+// 支持多种轨迹模式:
+// 支持分段轨迹（Piecewise）和解析轨迹（Analytic）。
+// 处理智能体和障碍物:
+// 根据是否为智能体，解析终端目标和通信延迟。
+// 配置参数控制:
+// 根据配置参数决定是否跳过未来轨迹、是否计算通信延迟等。
 void SANDO_NODE::convertDynTrajMsg2DynTraj(
     const dynus_interfaces::msg::DynTraj& msg,
     std::shared_ptr<DynTraj>& traj,
     double current_time) {
   // Inflate bbox using drone_bbox
   // We need to use the obstacle's bbox as well as ego drone's bbox
+  // 将障碍物的边界框（msg.bbox）与无人机的边界框（par_.drone_bbox）进行合并，生成一个膨胀后的边界框
   traj->bbox << msg.bbox[0] / 2.0 + par_.drone_bbox[0] / 2.0,
       msg.bbox[1] / 2.0 + par_.drone_bbox[1] / 2.0, msg.bbox[2] / 2.0 + par_.drone_bbox[2] / 2.0;
 
   // Get id
   traj->id = msg.id;
 
-  // Check if we should skip future trajectory information (for fair comparison)
+  // Check if we should skip future trajectory information (for fair comparison),判断是否只使用障碍物的当前位置，而忽略其未来轨迹信息
   bool skip_future_traj = par_.use_only_curr_pos_for_dynamic_obst && !msg.is_agent;
 
-  // Get pwp (skip if only using current position for obstacles)
+  // Get pwp (skip if only using current position for obstacles),如果不跳过未来轨迹，则将消息中的分段轨迹（msg.pwp）转换为内部的分段轨迹格式（traj->pwp）
   if (!skip_future_traj) {
     traj->pwp = sando_utils::convertPwpMsg2Pwp(msg.pwp);
     traj->mode = DynTraj::Mode::Piecewise;  // default to PWP; overridden below if analytic compiles
@@ -1077,7 +1095,7 @@ void SANDO_NODE::convertDynTrajMsg2DynTraj(
     traj->traj_vz = "0.0";
 
     // Compile as stationary point
-    if (traj->compileAnalytic()) {
+    if (traj->compileAnalytic()) {   // 调用 compileAnalytic 方法尝试编译静止轨迹。如果成功，则将轨迹模式设置为 Analytic（解析轨迹）；否则，记录警告日志
       traj->mode = DynTraj::Mode::Analytic;
     } else {
       RCLCPP_WARN(

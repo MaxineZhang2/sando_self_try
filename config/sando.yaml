@@ -52,11 +52,11 @@ sando_node:
         y_max: 200.0                                    # [m] Map y upper bound
         z_min: 0.5                                      # [m] Min altitude (points below are ground)
         z_max: 6.0                                      # [m] Max altitude
-        sando_map_res: 0.3                              # [m] Voxel map resolution
+        sando_map_res: 0.3                              # [m] Voxel map resolution，地图分辨率（单位：米）
 
         # --- Goal ---
-        force_goal_z: true                              # [-] Force goal to a fixed height (RViz GUI goals have z=0)
-        default_goal_z: 2.0                             # [m] Default goal altitude when force_goal_z is true
+        force_goal_z: true                              # [-] Force goal to a fixed height (RViz GUI goals have z=0)，是否强制目标点的高度固定
+        default_goal_z: 2.0                             # [m] Default goal altitude when force_goal_z is true，默认目标点高度
 
         # --- Dynamic Obstacles ---
         obst_max_vel: 0.5                               # [m/s] Expected max velocity of dynamic obstacles
@@ -67,52 +67,52 @@ sando_node:
 
         # --- Global Planner ---
         global_planner: "astar_heat"                    # ["sjps", "sastar", "astar_heat"]
-        inflation_hgp: 0.45                             # [m] Static obstacle inflation for global A* planning
-        hgp_timeout_duration_ms: 1000                   # [ms] Global planner timeout
+        inflation_hgp: 0.45                             # [m] Static obstacle inflation for global A* planning，全局 A* 规划的静态障碍物膨胀半径
+        hgp_timeout_duration_ms: 1000                   # [ms] Global planner timeout，全局规划器的超时时间（单位：毫秒）
         environment_assumption: "dynamic"               # ["static", "dynamic", "dynamic_worst_case"] Decomposition mode
 
         # --- Local Planning ---
-        horizon: 15.0                                   # [m] Planning horizon
-        goal_radius: 0.5                                # [m] Goal reached threshold
-        goal_seen_radius: 2.0                           # [m] Distance to stop replanning (too small makes planning very hard)
-        max_gurobi_comp_time_sec: 1.0                   # [s] Gurobi solver timeout per replanning cycle
+        horizon: 15.0                                   # [m] Planning horizon，规划视野范围（单位：米）
+        goal_radius: 0.5                                # [m] Goal reached threshold，目标点到达的阈值半径
+        goal_seen_radius: 2.0                           # [m] Distance to stop replanning (too small makes planning very hard)，停止重新规划的距离阈值
+        max_gurobi_comp_time_sec: 1.0                   # [s] Gurobi solver timeout per replanning cycle，每次重新规划的最大求解时间（单位：秒）
 
         # --- Dynamic Factor Adaptation ---
-        dynamic_factor_initial_mean: 1.5                # [-] Starting time-allocation factor (higher = more conservative)
+        dynamic_factor_initial_mean: 1.5                # [-] Starting time-allocation factor (higher = more conservative)，初始时间分配因子（越高越保守）
         factor_initial: 1.0                             # [-] Factor search lower bound
         factor_final: 2.5                               # [-] Factor search upper bound
         factor_constant_step_size: 0.1                  # [-] Factor search step size
         dynamic_factor_k_radius: 0.4                    # [-] Factor search half-width around previous success
 
         # --- Safety Corridors ---
-        sfc_size: [3.0, 3.0, 3.0]                       # [m] Local planning window (smaller = faster, larger = smoother)
-        dyn_base_inflation_m: 0.1                       # [m] Base inflation for dynamic obstacle bounding boxes in temporal SFC
-        inflate_unknown_boundary: true                  # [-] Inflate unknown voxel boundaries in SFC generation
-        traj_lifetime: 7.0                              # [s] Discard obstacle trajectories older than this
+        sfc_size: [3.0, 3.0, 3.0]                       # [m] Local planning window (smaller = faster, larger = smoother)，局部规划窗口大小（单位：米）
+        dyn_base_inflation_m: 0.1                       # [m] Base inflation for dynamic obstacle bounding boxes in temporal SFC，动态障碍物的基础膨胀半径
+        inflate_unknown_boundary: true                  # [-] Inflate unknown voxel boundaries in SFC generation，是否膨胀未知体素边界
+        traj_lifetime: 7.0                              # [s] Discard obstacle trajectories older than this，障碍物轨迹的有效时间（单位：秒）
 
-        # --- Dynamic Obstacle Heat (soft costs) ---
-        heat_alpha0: 0.2                                # [-] Weight for reachability blob (penalizes proximity to obstacle)
-        heat_alpha1: 1.0                                # [-] Weight for trajectory tube (penalizes crossing predicted path)
-        heat_Hmax: 2.0                                  # [-] Maximum dynamic heat value
-        dyn_heat_tube_radius_m: 0.5                     # [m] Heat corridor radius
+        # --- Dynamic Obstacle Heat (soft costs) ---动态障碍物热图
+        heat_alpha0: 0.2                                # [-] Weight for reachability blob (penalizes proximity to obstacle)，可达性热图的权重
+        heat_alpha1: 1.0                                # [-] Weight for trajectory tube (penalizes crossing predicted path)，轨迹管热图的权重
+        heat_Hmax: 2.0                                  # [-] Maximum dynamic heat value，动态热图的最大值
+        dyn_heat_tube_radius_m: 0.5                     # [m] Heat corridor radius，热图管道的半径
 
         # --- Static Obstacle Heat (boundary halo) ---
-        static_heat_alpha: 1.0                          # [-] Peak heat at obstacle boundary
+        static_heat_alpha: 1.0                          # [-] Peak heat at obstacle boundary，静态障碍物边界的热图峰值
         static_heat_Hmax: 5.0                           # [-] Maximum static heat value
-        static_heat_rmax_m: 1.0                         # [m] Maximum halo radius
+        static_heat_rmax_m: 1.0                         # [m] Maximum halo radius，静态热图的最大半径
 
         # --- Hover Avoidance ---
-        hover_avoidance_enabled: false                  # [-] Enable hover obstacle repulsion
-        hover_avoidance_d_trigger: 4.0                  # [m] Distance threshold to trigger avoidance
-        hover_avoidance_h: 3.0                          # [m] Evasion distance
+        hover_avoidance_enabled: false                  # [-] Enable hover obstacle repulsion，是否启用悬停障碍物规避
+        hover_avoidance_d_trigger: 4.0                  # [m] Distance threshold to trigger avoidance，触发规避的距离阈值
+        hover_avoidance_h: 3.0                          # [m] Evasion distance，规避的距离
 
         # --- Yaw ---
         w_max_yawing: 0.5                               # [rad/s] Yaw rate during YAWING state (~29 deg/s)
 
         # --- Obstacle Tracking ---
-        cluster_tolerance: 1.0                          # [m] Clustering distance for obstacle detection
-        prediction_horizon: 1.0                         # [s] How far ahead to predict obstacle motion
-        velocity_threshold: 0.8                         # [m/s] Speed threshold: below = static, above = dynamic
+        cluster_tolerance: 1.0                          # [m] Clustering distance for obstacle ，障碍物检测的聚类距离
+        prediction_horizon: 1.0                         # [s] How far ahead to predict obstacle motion，障碍物运动预测的时间范围
+        velocity_threshold: 0.8                         # [m/s] Speed threshold: below = static, above = dynamic，静态与动态障碍物的速度阈值
 
         # --- Map Window ---
         initial_wdx: 15.0                               # [m] Initial map window width
@@ -123,21 +123,21 @@ sando_node:
         depth_camera_depth_max: 10.0                    # [m] Max depth camera range (d435 in simulation)
 
         # =====================================================================
-        # [INTERNAL] — Safe defaults, change only if you understand the algorithm
+        # [INTERNAL] — Safe defaults, change only if you understand the algorithm，这些参数是算法的默认值，通常不需要更改，除非对算法有深入理解
         # =====================================================================
 
         # --- Mode ---
         flight_mode: "terminal_goal"                    # ["terminal_goal"] Only one mode exists
-        use_global_pc: true                             # [-] Use global pointcloud (known environment)
+        use_global_pc: true                             # [-] Use global pointcloud (known environment)，是否使用全局点云
 
         # --- Global Planner Internals ---
-        factor_hgp: 1.0                                 # [-] Do not change — resolution = factor_hgp * map_res
-        max_num_expansion: 100000                       # [-] Max A* node expansions
+        factor_hgp: 1.0                                 # [-] Do not change — resolution = factor_hgp * map_res，分辨率因子
+        max_num_expansion: 100000                       # [-] Max A* node expansions，A* 算法的最大节点扩展数
         use_free_start: true                            # [-] Free the start voxel if occupied
         free_start_factor: 2.0                          # [-] Radius factor for start freeing
         use_free_goal: false                            # [-] Free the goal voxel if occupied
         free_goal_factor: 2.0                           # [-] Radius factor for goal freeing
-        global_planner_heuristic_weight: 2.0            # [-] A* heuristic weight (higher = greedier)
+        global_planner_heuristic_weight: 2.0            # [-] A* heuristic weight (higher = greedier)，A* 启发式权重（越高越贪婪）
         heat_weight: 10.0                               # [-] Overall heat map weight in A* cost
         max_dist_vertexes: 1.0                          # [m] Max distance between path vertices
         w_unknown: 0.0                                  # [-] Cost weight for unknown cells

@@ -1024,9 +1024,20 @@ void HGPManager::updateMap(
   auto start_time = std::chrono::high_resolution_clock::now();
 
   mtx_map_util_.lock();
+  // 把连续点云转换成离散 voxel grid
+  // 标记 free / occupied / unknown
+  // 对静态障碍膨胀 inflation_hgp
+  // 把动态障碍加入地图或用于代价层
+  // 限制 z 范围
   map_util_->readMap(
       pclptr, pclptr_unk, (int)(wdx / res_), (int)(wdy / res_), (int)(wdz / res_), center_map,
       par_.z_min, par_.z_max, par_.inflation_hgp, obst_pos, obst_bbox, traj_max_time);
+  // 这个 voxel map 后面给：
+  // HGP 全局搜索
+  // 安全走廊生成
+  // 动态 heat map
+  // 碰撞检查
+  // 使用。
   mtx_map_util_.unlock();
 
   // Get the elapsed time for reading the map

@@ -236,7 +236,9 @@ Then open **http://localhost:8080** in your browser. RViz will appear; use "2D N
 **1. Clone the Repository**
 
 ```bash
+## 创建工作空间目录并进入
 mkdir -p ~/code/sando_ws/src && cd ~/code/sando_ws/src
+## 克隆仓库（包括子模块）
 git clone --recursive https://github.com/mit-acl/sando.git
 cd sando
 ```
@@ -244,6 +246,7 @@ cd sando
 **2. Run the Setup Script**
 
 ```bash
+## 执行安装脚本
 ./setup.sh
 ```
 
@@ -253,6 +256,12 @@ This automated script will:
 - Build Livox-SDK2 and livox_ros_driver2
 - Build SANDO and all ROS dependencies
 - Configure your `~/.bashrc` for future use
+脚本功能：
+安装 ROS 2 Humble（如果尚未安装）。
+安装所有系统依赖项和 Gurobi（一个数学优化工具）。
+构建 Livox-SDK2 和 livox_ros_driver2（用于激光雷达的 SDK 和驱动）。
+构建 SANDO 项目及其所有 ROS 依赖项。
+配置 ~/.bashrc 文件以便后续使用。
 
 **Notes:**
 - You'll be prompted for sudo password once at the start
@@ -260,10 +269,20 @@ This automated script will:
 - Use `./setup.sh -j 4` to increase build parallelism (default: all CPUs)
 - The script appends ROS 2 sourcing, workspace sourcing, Gurobi environment variables, and library paths to `~/.bashrc`
 - After completion, run `source ~/.bashrc` to use SANDO immediately
+注意事项：
+脚本运行时会提示输入 sudo 密码（仅在开始时需要）。
+如果安装失败，可以安全地重新运行脚本（已安装的组件会被跳过）。
+可以通过 ./setup.sh -j 4 增加构建并行度（默认使用所有 CPU）。
+脚本会将以下内容追加到 ~/.bashrc：
+ROS 2 环境变量。
+工作空间的环境变量。
+Gurobi 的环境变量。
+必要的库路径。
+脚本完成后，运行以下命令使配置生效：source ~/.bashrc
 
-**3. Obtain a Gurobi License**
+**3. Obtain a Gurobi License** 获取 Gurobi 许可证
 
-Gurobi is installed by the setup script but requires a license to run. Get a free [academic license](https://www.gurobi.com/academia/academic-program-and-licenses/), then activate it:
+Gurobi is installed by the setup script but requires a license to run. Get a free [academic license](https://www.gurobi.com/academia/academic-program-and-licenses/), then activate it:Gurobi 是一个数学优化工具，安装脚本会自动安装它，但需要许可证才能运行，用户可以通过 Gurobi Academic Program 获取免费的学术许可证：
 
 ```bash
 source ~/.bashrc
