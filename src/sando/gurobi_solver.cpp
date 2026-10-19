@@ -12,6 +12,7 @@
 #include <sando/gurobi_solver.hpp>
 #include <sando/gurobi_solver_utils.hpp>
 
+#ifndef SANDO_USE_COPT
 void MyCallback::callback() {  // This function is called periodically along the optimization
                                // process.
   //  It is called several times more after terminating the program
@@ -20,8 +21,14 @@ void MyCallback::callback() {  // This function is called periodically along the
                            // this class terminated_ = true;
   }
 }
+#endif
 
-void SolverGurobi::stopExecution() { cb_.should_terminate_ = true; }
+void SolverGurobi::stopExecution() {
+  cb_.should_terminate_ = true;
+#ifdef SANDO_USE_COPT
+  m_.interrupt();
+#endif
+}
 
 void SolverGurobi::resetToNominalState() { cb_.should_terminate_ = false; }
 
@@ -96,7 +103,7 @@ void SolverGurobi::getCoefficientsDoubleFaster_() {
   for (int axis = 0; axis < 3; ++axis) {
     x_double_[axis].resize(4 * N_);
     for (int i = 0; i < 4 * N_; ++i)
-      x_double_[axis][i] = x_faster_vars_[axis][i].get(GRB_DoubleAttr_X);
+      x_double_[axis][i] = solverVarValue(x_faster_vars_[axis][i]);
   }
 }
 
@@ -1997,7 +2004,7 @@ void SolverGurobi::getDependentCoefficientsN4Double() {
     getInitialAndFinalConditions(P0, V0, A0, Pf, Vf, Af, axis);
 
     // get free parameters
-    double d3_val = d3_[axis].get(GRB_DoubleAttr_X);
+    double d3_val = solverVarValue(d3_[axis]);
 
     // C++ expressions for composite cubic Bézier control coefficients (one coordinate) in terms of
     // lambda:
@@ -2213,8 +2220,8 @@ void SolverGurobi::getDependentCoefficientsN5Double() {
     getInitialAndFinalConditions(P0, V0, A0, Pf, Vf, Af, axis);
 
     // get free parameters
-    double d3_val = d3_[axis].get(GRB_DoubleAttr_X);
-    double d4_val = d4_[axis].get(GRB_DoubleAttr_X);
+    double d3_val = solverVarValue(d3_[axis]);
+    double d4_val = solverVarValue(d4_[axis]);
 
     // C++ Code for the coefficients:
     double a0 =
@@ -2677,9 +2684,9 @@ void SolverGurobi::getDependentCoefficientsN6Double() {
     getInitialAndFinalConditions(P0, V0, A0, Pf, Vf, Af, axis);
 
     // get free parameters
-    double d3_val = d3_[axis].get(GRB_DoubleAttr_X);
-    double d4_val = d4_[axis].get(GRB_DoubleAttr_X);
-    double d5_val = d5_[axis].get(GRB_DoubleAttr_X);
+    double d3_val = solverVarValue(d3_[axis]);
+    double d4_val = solverVarValue(d4_[axis]);
+    double d5_val = solverVarValue(d5_[axis]);
 
     // C++ Code for the coefficients:
     double a0 =
@@ -3651,9 +3658,13 @@ void SolverGurobi::getDependentCoefficientsN6Double() {
 }
 
 void SolverGurobi::removeVars() {
+#ifdef SANDO_USE_COPT
+  std::vector<GRBVar> vars = m_.getVars();
+#else
   GRBVar* vars = 0;
   vars = m_.getVars();
-  for (int i = 0; i < m_.get(GRB_IntAttr_NumVars); ++i) {
+#endif
+  for (int i = 0; i < static_cast<int>(m_.get(GRB_IntAttr_NumVars)); ++i) {
     m_.remove(vars[i]);
   }
   x_.clear();
@@ -4743,7 +4754,7 @@ bool SolverGurobi::generateNewTrajectory(
     last_solve_timing_.callOptimizer_ms = 1e3 * dur(t7 - t6).count();
 
     if (solved) {
-      gurobi_computation_time = m_.get(GRB_DoubleAttr_Runtime) * 1000;
+      gurobi_computation_time = static_cast<double>(m_.get(GRB_DoubleAttr_Runtime)) * 1000;
       initializeGoalSetpoints();
 
       if (usingFaster_() || !using_variable_elimination_) {
@@ -4815,7 +4826,8 @@ bool SolverGurobi::generateNewTrajectorySequentialFactors(
       if (solved) {
         initializeGoalSetpoints();
         factor_that_worked = f;
-        gurobi_computation_time_ms = m_.get(GRB_DoubleAttr_Runtime) * 1000.0;
+        gurobi_computation_time_ms =
+            static_cast<double>(m_.get(GRB_DoubleAttr_Runtime)) * 1000.0;
 
         if (usingFaster_() || !using_variable_elimination_) {
           getCoefficientsDoubleFaster_();
@@ -4972,12 +4984,12 @@ bool SolverGurobi::callOptimizer() {
   // Optimize
   m_.optimize();
 
-  int optimstatus = m_.get(GRB_IntAttr_Status);
+  int optimstatus = static_cast<int>(m_.get(GRB_IntAttr_Status));
 
   // Check if the optimization was successful
   if (optimstatus == GRB_OPTIMAL) {
     solved = true;
-    objective_value_ = m_.get(GRB_DoubleAttr_ObjVal);
+    objective_value_ = static_cast<double>(m_.get(GRB_DoubleAttr_ObjVal));
   } else {
     solved = false;
 

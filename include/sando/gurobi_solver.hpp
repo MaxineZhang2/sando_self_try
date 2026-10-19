@@ -13,7 +13,11 @@
 #include <decomp_rviz_plugins/data_ros_utils.hpp>
 #include <sando/sando_type.hpp>
 #include "hgp/termcolor.hpp"
+#ifdef SANDO_USE_COPT
+#include "sando/copt_compat.hpp"
+#else
 #include "gurobi_c++.h"
+#endif
 #include "timer.hpp"
 #include <type_traits>
 #include <unsupported/Eigen/Polynomials>
@@ -22,6 +26,22 @@ using namespace termcolor;
 enum ConstraintType { POSITION, VELOCITY, ACCELERATION, JERK };
 typedef timer::Timer MyTimer;
 
+inline double solverVarValue(const GRBVar& var) {
+#ifdef SANDO_USE_COPT
+  return var.Get(COPT_DBLINFO_VALUE);
+#else
+  return var.get(GRB_DoubleAttr_X);
+#endif
+}
+
+#ifdef SANDO_USE_COPT
+class MyCallback {
+ public:
+  std::atomic<bool> should_terminate_;
+  MyCallback() : should_terminate_(false) {}
+  void callback() {}
+};
+#else
 class MyCallback : public GRBCallback {
  public:
   std::atomic<bool> should_terminate_;
@@ -30,6 +50,7 @@ class MyCallback : public GRBCallback {
  protected:
   void callback();
 };
+#endif
 
 class SolverGurobi {
  public:

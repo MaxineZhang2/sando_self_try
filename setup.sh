@@ -1,22 +1,33 @@
 #!/bin/bash
 # --------------------------------------------------------------------------
 # SANDO Setup Script
-# Installs ROS 2 Humble, Gurobi, and all dependencies, then builds the workspace.
+# Installs ROS 2 Humble, a selected optimization backend, and all dependencies.
 #
 # Usage:
 #   git clone --branch v0.0.3 --recursive https://github.com/mit-acl/sando.git
 #   cd sando && ./setup.sh [-j N]
 #
-#   -j N  Number of parallel jobs for building (default: all CPUs)
+#   -j N              Number of parallel jobs for building (default: all CPUs)
+#   --solver copt     Use COPT (default; COPT must be installed separately)
+#   --solver gurobi   Use the original Gurobi backend
 # --------------------------------------------------------------------------
 set -e
 
 # Parse arguments
 NUM_JOBS=$(nproc)
+SOLVER="copt"
 while [[ $# -gt 0 ]]; do
     case $1 in
         -j|--jobs)
             NUM_JOBS="$2"
+            shift 2
+            ;;
+        --solver)
+            SOLVER="$2"
+            if [[ "$SOLVER" != "copt" && "$SOLVER" != "gurobi" ]]; then
+                echo "--solver must be copt or gurobi"
+                exit 1
+            fi
             shift 2
             ;;
         *)
@@ -130,13 +141,13 @@ sudo apt-get install -y \
     ros-${ROS_DISTRO}-rqt-gui-py
 
 # ============================================================
-# 5. Gurobi (if not already installed)
+# 5. Optimization backend
 # ============================================================
 echo ""
 echo "============================================="
-echo "STEP 5: Installing Gurobi"
+echo "STEP 5: Checking $SOLVER"
 echo "============================================="
-if [ ! -d "/opt/gurobi1103" ]; then
+if [ "$SOLVER" = "gurobi" ] && [ ! -d "/opt/gurobi1103" ]; then
     echo "Installing Gurobi 11.0.3..."
     wget -q https://packages.gurobi.com/11.0/gurobi11.0.3_linux64.tar.gz -P /tmp
     sudo tar -xzf /tmp/gurobi11.0.3_linux64.tar.gz -C /opt
@@ -147,13 +158,21 @@ if [ ! -d "/opt/gurobi1103" ]; then
     echo "  NOTE: Place your Gurobi license file at ~/gurobi.lic"
     echo "  Free academic licenses: https://www.gurobi.com/academia/academic-program-and-licenses/"
     echo ""
-else
+elif [ "$SOLVER" = "gurobi" ]; then
     echo "Gurobi already installed, skipping..."
 fi
 
-export GUROBI_HOME="/opt/gurobi1103/linux64"
-export PATH="${PATH}:${GUROBI_HOME}/bin"
-export LD_LIBRARY_PATH="${GUROBI_HOME}/lib:${LD_LIBRARY_PATH}"
+if [ "$SOLVER" = "gurobi" ]; then
+    export GUROBI_HOME="/opt/gurobi1103/linux64"
+    export PATH="${PATH}:${GUROBI_HOME}/bin"
+    export LD_LIBRARY_PATH="${GUROBI_HOME}/lib:${LD_LIBRARY_PATH}"
+else
+    : "${COPT_HOME:?Set COPT_HOME to your COPT installation directory before running setup.sh}"
+    test -f "$COPT_HOME/include/copt.h" || { echo "Missing $COPT_HOME/include/copt.h"; exit 1; }
+    test -f "$COPT_HOME/lib/libcopt_cpp.so" || { echo "Missing $COPT_HOME/lib/libcopt_cpp.so"; exit 1; }
+    export PATH="${PATH}:${COPT_HOME}/bin"
+    export LD_LIBRARY_PATH="${COPT_HOME}/lib:${LD_LIBRARY_PATH}"
+fi
 
 # ============================================================
 # 6. Clone/Checkout SANDO and initialize submodules
@@ -286,6 +305,7 @@ colcon build \
     --cmake-args -DCMAKE_BUILD_TYPE=Release \
                  -DCMAKE_CXX_COMPILER=/usr/bin/g++ \
                  -DCMAKE_C_COMPILER=/usr/bin/gcc \
+                 -DSANDO_USE_COPT=$( [ "$SOLVER" = "copt" ] && echo ON || echo OFF ) \
     --allow-overriding gazebo_dev gazebo_msgs gazebo_ros gazebo_ros_pkgs gazebo_plugins
 
 # ============================================================
@@ -296,15 +316,22 @@ echo "============================================="
 echo "STEP 12: Setting Up Bash Configuration"
 echo "============================================="
 
-# Add Gurobi to bashrc (idempotent)
-grep -qxF 'export GUROBI_HOME="/opt/gurobi1103/linux64"' ~/.bashrc || cat >> ~/.bashrc << 'BASHEOF'
-
-# Gurobi
+# Add the selected solver to bashrc (idempotent)
+if [ "$SOLVER" = "gurobi" ]; then
+    grep -qxF 'export GUROBI_HOME="/opt/gurobi1103/linux64"' ~/.bashrc || cat >> ~/.bashrc << 'BASHEOF'
 export GUROBI_HOME="/opt/gurobi1103/linux64"
 export PATH="${PATH}:${GUROBI_HOME}/bin"
 export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${GUROBI_HOME}/lib"
 export GRB_LICENSE_FILE="$HOME/gurobi.lic"
 BASHEOF
+else
+    grep -qxF "export COPT_HOME=\"$COPT_HOME\"" ~/.bashrc || cat >> ~/.bashrc <<BASHEOF
+export COPT_HOME="$COPT_HOME"
+export PATH="\${PATH}:\${COPT_HOME}/bin"
+export LD_LIBRARY_PATH="\${COPT_HOME}/lib:\${LD_LIBRARY_PATH}"
+export COPT_LICENSE_DIR="\${HOME}/copt"
+BASHEOF
+fi
 
 # Add Livox library path
 grep -qxF "export LD_LIBRARY_PATH=$LIVOX_WS/install/livox_ros_driver2/lib:\$LD_LIBRARY_PATH" ~/.bashrc || \

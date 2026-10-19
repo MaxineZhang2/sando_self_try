@@ -1,0 +1,25 @@
+find_path(COPT_INCLUDE_DIR
+  NAMES copt.h
+  HINTS ${COPT_DIR} $ENV{COPT_HOME}
+  PATH_SUFFIXES include)
+
+find_path(COPT_CPP_INCLUDE_DIR
+  NAMES coptcpp_pch.h
+  HINTS ${COPT_DIR} $ENV{COPT_HOME}
+  PATH_SUFFIXES include/coptcpp_inc include)
+
+find_library(COPT_CPP_LIBRARY
+  NAMES copt_cpp
+  HINTS ${COPT_DIR} $ENV{COPT_HOME}
+  PATH_SUFFIXES lib)
+
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(COPT
+  REQUIRED_VARS COPT_INCLUDE_DIR COPT_CPP_INCLUDE_DIR COPT_CPP_LIBRARY)
+
+if(COPT_FOUND)
+  set(COPT_INCLUDE_DIRS ${COPT_INCLUDE_DIR} ${COPT_CPP_INCLUDE_DIR})
+  set(COPT_LIBRARIES ${COPT_CPP_LIBRARY})
+endif()
+
+mark_as_advanced(COPT_INCLUDE_DIR COPT_CPP_INCLUDE_DIR COPT_CPP_LIBRARY)
